@@ -4,11 +4,12 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Extract beautiful gradients from sunset and sunrise photos" />
-    <title>Gradient Extraction App</title>
+    <meta name="description" content="Create beautiful gradient experiments from images" />
+    <title>Gradient Experiment</title>
     <style>
-      /* Fallback styles that will show until React loads or if React fails to load */
+      /* Hide fallback content immediately */
       .fallback {
+        display: none;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         max-width: 600px;
         margin: 0 auto;
@@ -30,17 +31,18 @@
         margin: 2rem 0;
         background: linear-gradient(to right, #ff7e5f, #feb47b);
       }
-      #root:not(:empty) + .fallback {
-        display: none;
+      /* Only show fallback if we add a specific class to the body */
+      body.show-fallback .fallback {
+        display: block;
       }
     </style>
   </head>
   <body>
     <div id="root"></div>
     
-    <!-- This will only be visible if React doesn't render anything in #root -->
+    <!-- This fallback is now hidden by default -->
     <div class="fallback">
-      <h1>Gradient Extraction App</h1>
+      <h1>Gradient Experiment</h1>
       <p>This is a fallback message. If you're seeing this, React may not be loading correctly.</p>
       <div class="fallback-gradient"></div>
       <p>Please check the browser console for errors (F12 or right-click > Inspect > Console).</p>

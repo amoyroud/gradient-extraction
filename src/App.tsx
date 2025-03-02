@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react'
 import ImageUploader from './components/ImageUploader'
 import GradientDisplay from './components/GradientDisplay'
 import LoadingSpinner from './components/LoadingSpinner'
-import Footer from './components/Footer'
 import { ColorPalette, Gradient } from './types'
 import PremiumLanding from './components/PremiumLanding'
+import FloatingGradientLanding from './components/FloatingGradientLanding'
 
 const App = () => {
   console.log('App component rendering')
@@ -19,14 +19,14 @@ const App = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null)
   const [palette, setPalette] = useState<ColorPalette | null>(null)
   const [showUploader, setShowUploader] = useState<boolean>(false)
+  const [showLanding, setShowLanding] = useState<boolean>(true)
 
   useEffect(() => {
     console.log('App component mounted')
     // Check if all imported components are available
     console.log('Components available:', {
       ImageUploader: !!ImageUploader,
-      GradientDisplay: !!GradientDisplay,
-      Footer: !!Footer
+      GradientDisplay: !!GradientDisplay
     })
 
     // Check for errors during initialization
@@ -58,6 +58,7 @@ const App = () => {
   };
   
   const handleGetStarted = () => {
+    setShowLanding(false);
     setShowUploader(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -72,9 +73,18 @@ const App = () => {
     setUploadedImage(URL.createObjectURL(file));
   };
 
+  // Handler to reset the uploaded image
+  const handleResetImage = useCallback(() => {
+    setUploadedImage(null);
+    setImageUrl(null);
+    setPalette(null);
+    setSelectedGradient(null);
+    setShowLanding(true);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <div className="container mx-auto px-4 py-8 flex-grow flex flex-col">
         {error && (
           <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-md">
             <p>{error}</p>
@@ -88,24 +98,30 @@ const App = () => {
         )}
 
         {!uploadedImage ? (
-          <div className="max-w-3xl mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-light mb-4 tracking-tight text-gray-900">
-                Discover Your Perfect Sunset Palette
-              </h1>
-              <p className="text-lg text-gray-600">
-                Upload a sunset photo to generate beautiful color palettes and gradients for your design projects
-              </p>
-            </div>
-            
-            <ImageUploader 
-              setImageUrl={setImageUrl}
-              setUploadedImage={setUploadedImage} 
-              setColorPalette={setPalette}
-              setError={setError}
-              setIsLoading={setIsLoading}
-            />
-          </div>
+          <>
+            {showLanding ? (
+              <FloatingGradientLanding onGetStarted={handleGetStarted} />
+            ) : (
+              <div className="max-w-3xl mx-auto my-auto flex-grow flex flex-col justify-center">
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-light mb-4 tracking-tight text-gray-900">
+                    Discover Your Perfect Sunset Palette
+                  </h1>
+                  <p className="text-lg text-gray-600">
+                    Upload a sunset photo to generate beautiful color palettes and gradients for your design projects
+                  </p>
+                </div>
+                
+                <ImageUploader 
+                  setImageUrl={setImageUrl}
+                  setUploadedImage={setUploadedImage} 
+                  setColorPalette={setPalette}
+                  setError={setError}
+                  setIsLoading={setIsLoading}
+                />
+              </div>
+            )}
+          </>
         ) : (
           <>
             {isLoading ? (
@@ -118,28 +134,15 @@ const App = () => {
               <GradientDisplay 
                 palette={palette} 
                 uploadedImage={uploadedImage}
-                onSelectGradient={handleSelectGradient} 
+                onSelectGradient={handleSelectGradient}
+                onResetImage={handleResetImage}
               />
             )}
-            
-            <div className="text-center mt-8">
-              <button
-                onClick={() => {
-                  setUploadedImage(null);
-                  setImageUrl(null);
-                  setPalette(null);
-                  setSelectedGradient(null);
-                }}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
-              >
-                Upload a different image
-              </button>
-            </div>
           </>
         )}
       </div>
-
-      <Footer />
+      
+      {/* Footer has been removed */}
     </div>
   )
 }

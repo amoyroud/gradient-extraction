@@ -15,12 +15,14 @@ interface UpdatedGradientDisplayProps {
   palette: ColorPalette;
   uploadedImage: string;
   onSelectGradient: (gradient: Gradient) => void;
+  onResetImage?: () => void; // Add a callback for resetting the image
 }
 
 const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({ 
   palette, 
   uploadedImage, 
-  onSelectGradient 
+  onSelectGradient,
+  onResetImage 
 }) => {
   const [gradients, setGradients] = useState<Gradient[]>([])
   const [selectedGradient, setSelectedGradient] = useState<Gradient | null>(null)
@@ -29,6 +31,7 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
   const [showCSS, setShowCSS] = useState(false)
   const [colorCount, setColorCount] = useState<number>(palette.colors.length || 7)
   const [updatedPalette, setUpdatedPalette] = useState<ColorPalette>(palette)
+  const [mainGradientUpdated, setMainGradientUpdated] = useState(false)
   
   // Initialize palette with the provided palette
   useEffect(() => {
@@ -43,6 +46,8 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
       // Extract colors from the image using our simplified extractor
       const newPalette = await extractColors(uploadedImage, colorCount);
       setUpdatedPalette(newPalette);
+      // Set flag to indicate main gradient should be updated
+      setMainGradientUpdated(false);
     } catch (error) {
       console.error('Error processing image:', error);
     } finally {
@@ -67,21 +72,27 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
     const generatedGradients = generateGradients(updatedPalette);
     setGradients(generatedGradients);
     
-    // Only set selected gradient if none is currently selected
-    if (!selectedGradient && generatedGradients.length > 0) {
-      const firstGradient = generatedGradients[0];
-      setSelectedGradient(firstGradient);
+    // Only set selected gradient if none is currently selected or mainGradientUpdated is false
+    if ((!selectedGradient && generatedGradients.length > 0) || !mainGradientUpdated) {
+      const currentGradientType = selectedGradient?.direction || 'to bottom';
+      // Try to find a gradient with the same type as the currently selected one
+      const sameTypeGradient = generatedGradients.find(g => g.direction === currentGradientType);
       
-      // Notify parent component about the initially selected gradient
+      const gradientToSelect = sameTypeGradient || generatedGradients[0];
+      setSelectedGradient(gradientToSelect);
+      setMainGradientUpdated(true);
+      
+      // Notify parent component about the selected gradient
       if (onSelectGradient) {
-        onSelectGradient(firstGradient);
+        onSelectGradient(gradientToSelect);
       }
     }
-  }, [updatedPalette, selectedGradient]); // Don't include onSelectGradient
+  }, [updatedPalette, selectedGradient, mainGradientUpdated]); // Don't include onSelectGradient
   
   const handleGradientSelect = (gradient: Gradient) => {
     console.log('Gradient selected:', gradient.id, gradient.direction);
     setSelectedGradient(gradient);
+    setMainGradientUpdated(true);
     
     // Notify parent component
     onSelectGradient(gradient);
@@ -93,6 +104,13 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
       setTimeout(() => setCopied(false), 2000)
     })
   }
+  
+  // Add a new function to copy the color palette
+  const handleCopyColorPalette = () => {
+    if (!updatedPalette || !updatedPalette.colors.length) return;
+    const colorValues = updatedPalette.colors.join(', ');
+    copyToClipboard(colorValues);
+  };
   
   // Generate an A4 gradient image
   const generateA4Gradient = (gradient: Gradient, colors: string[]): Promise<string> => {
@@ -220,6 +238,12 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
     }
   };
   
+  const handleResetImage = () => {
+    if (onResetImage) {
+      onResetImage();
+    }
+  };
+  
   // Helper function to get an appropriate label for the gradient
   const getGradientLabel = (gradient: Gradient): string => {
     if (gradient.direction.includes('to bottom (')) {
@@ -238,7 +262,7 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
   
   // Helper function to determine the CSS class for a gradient thumbnail
   const getGradientThumbnailClass = (gradient: Gradient): string => {
-    let baseClass = 'gradient-thumbnail rounded-md w-full h-24 shadow-sm transition-all hover:shadow-md cursor-pointer z-10 relative';
+    let baseClass = 'gradient-thumbnail rounded-md w-full h-20 shadow-sm transition-all hover:shadow-md cursor-pointer z-10 relative';
     
     if (selectedGradient?.id === gradient.id) {
       baseClass += ' ring-2 ring-blue-500 scale-105';
@@ -266,46 +290,64 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
     copyToClipboard(`background-image: ${selectedGradient.css};`);
   };
   
+  const handleRefreshMainGradient = () => {
+    if (selectedGradient) {
+      // Re-apply the current selected gradient to ensure it updates
+      handleGradientSelect(selectedGradient);
+    }
+  };
+  
   if (!gradients.length) return null;
   
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 mt-4">
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+    <div className="max-w-6xl mx-auto px-2 py-2 mt-0">
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
         {/* Left column - Image preview and color palette */}
-        <div className="order-2 md:order-1">
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <h3 className="text-lg font-medium mb-4 text-gray-800">Original Image</h3>
-            <div className="rounded-lg overflow-hidden shadow-inner max-h-[300px]">
+        <div className="order-2 md:order-1 md:col-span-3">
+          <div className="bg-white rounded-lg shadow-md p-2 mb-2">
+            <h3 className="text-base font-medium mb-1 text-gray-800">Original Image</h3>
+            <div className="rounded-lg overflow-hidden shadow-inner max-h-[130px]">
               <img 
                 src={uploadedImage} 
                 alt="Uploaded sunset" 
-                className="w-full object-cover" 
+                className="w-full object-cover h-auto" 
               />
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <h3 className="text-lg font-medium mb-4 text-gray-800">Color Palette</h3>
-            <div className="flex flex-wrap gap-2">
+          <div className="bg-white rounded-lg shadow-md p-2 mb-2">
+            <h3 className="text-base font-medium mb-1 text-gray-800">Color Palette</h3>
+            <div className="flex flex-wrap gap-1">
               {updatedPalette.colors.map((color, index) => (
                 <div 
                   key={index} 
-                  className="w-10 h-10 rounded-md shadow-sm" 
+                  className="w-6 h-6 rounded-md shadow-sm" 
                   style={{ backgroundColor: color }}
                   title={color}
                 />
               ))}
+              {/* Updated button to match Download and Upload styling */}
+              <button
+                onClick={handleCopyColorPalette}
+                className="ml-1 px-2 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition text-sm"
+                title="Copy Color Palette"
+              >
+                {copied ? "✓ Copied" : "Copy Colors"}
+              </button>
             </div>
           </div>
           
           {/* Color count slider - replacing the yellow box in the sketch */}
-          <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-            <h3 className="text-lg font-medium mb-4 text-gray-800">Color Extraction Settings</h3>
+          <div className="bg-white rounded-lg shadow-md p-2 mb-2">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="text-base font-medium text-gray-800">Color Extraction</h3>
+              {/* Removed the Update button */}
+            </div>
             <div>
-              <label htmlFor="colorCount" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="colorCount" className="block text-xs font-medium text-gray-700 mb-0.5">
                 Number of Colors: {colorCount}
               </label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <span className="text-xs">2</span>
                 <input
                   type="range"
@@ -314,70 +356,74 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
                   max="12"
                   value={colorCount}
                   onChange={(e) => setColorCount(parseInt(e.target.value))}
-                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                 />
                 <span className="text-xs">12</span>
               </div>
-              <p className="mt-2 text-xs text-gray-500 italic">
-                Adjusting the slider will regenerate the color palette and gradients.
+              <p className="mt-0.5 text-xs text-gray-500 italic">
+                Adjusting automatically regenerates the colors.
               </p>
             </div>
+          </div>
+
+          {/* Add "Upload a different image" button here */}
+          <div className="text-center mt-2 mb-2">
+            <button
+              onClick={handleResetImage}
+              className="w-full px-2 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition text-sm"
+            >
+              Upload a different image
+            </button>
           </div>
         </div>
         
         {/* Middle column - Main gradient display */}
-        <div className="order-1 md:order-2 md:col-span-2">
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-medium text-gray-800">Generated Gradient</h2>
-              <div className="flex space-x-2">
-                <button 
-                  onClick={handleCopyCSS}
-                  className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                >
-                  {copied ? 'Copied!' : 'Copy CSS'}
-                </button>
-                <button 
-                  onClick={downloadGradient}
-                  disabled={isLoading}
-                  className="px-3 py-1 text-sm bg-purple-600 text-white rounded hover:bg-purple-700 transition"
-                >
-                  {isLoading ? 'Generating...' : 'Download'}
-                </button>
-              </div>
+        <div className="order-1 md:order-2 md:col-span-6">
+          <div className="bg-white rounded-lg shadow-md p-2 mb-2">
+            <div className="flex justify-between items-center mb-1">
+              <h2 className="text-lg font-medium text-gray-800">Generated Gradient</h2>
+              <button 
+                onClick={downloadGradient}
+                disabled={isLoading}
+                className="px-2 py-1.5 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition text-sm"
+              >
+                {isLoading ? 'Generating...' : 'Download'}
+              </button>
             </div>
             
-            <div className="aspect-[3/4] w-full rounded-lg shadow-lg overflow-hidden mb-4">
+            {/* A4 aspect ratio container - reduced height by scaling to 75% */}
+            <div className="relative w-full rounded-lg shadow-lg overflow-hidden mb-2" 
+                 style={{ paddingBottom: `${A4_ASPECT_RATIO * 100}%` }}>
               {selectedGradient ? (
                 <div 
-                  className="w-full h-full"
+                  className="absolute inset-0 w-full h-full"
                   style={{ background: selectedGradient.css }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gray-100">
                   <p className="text-gray-500">Select a gradient to preview</p>
                 </div>
               )}
             </div>
             
             {selectedGradient && (
-              <div className="bg-gray-50 p-3 rounded-md">
-                <p className="text-sm text-gray-700 font-medium mb-1">Type: {getGradientLabel(selectedGradient)}</p>
-                <p className="text-xs text-gray-500 font-mono overflow-x-auto whitespace-nowrap">{selectedGradient.css}</p>
+              <div className="bg-gray-50 p-1.5 rounded-md">
+                <p className="text-xs text-gray-700 font-medium mb-0.5">Type: {getGradientLabel(selectedGradient)}</p>
+                <p className="text-xs text-gray-500 font-mono overflow-x-auto whitespace-nowrap pb-0.5 text-[10px]">{selectedGradient.css}</p>
               </div>
             )}
           </div>
         </div>
         
         {/* Right column - Gradient variations moved to the right of the main display */}
-        <div className="order-3 md:order-3">
-          <div className="bg-white rounded-lg shadow-md p-4 h-full">
-            <h3 className="text-lg font-medium mb-4 text-gray-800">Gradient Variations</h3>
-            <div className="grid grid-cols-1 gap-4">
+        <div className="order-3 md:order-3 md:col-span-3">
+          <div className="bg-white rounded-lg shadow-md p-2 h-full">
+            <h3 className="text-base font-medium mb-1 text-gray-800">Gradient Variations</h3>
+            <div className="grid grid-cols-2 gap-2" style={{ height: "calc(100vh - 140px)", overflowY: "auto", maxHeight: "480px" }}>
               {gradients.map((gradient) => (
                 <div 
                   key={gradient.id} 
-                  className="flex flex-col items-center hover:bg-gray-50 p-2 rounded-lg cursor-pointer"
+                  className="flex flex-col items-center hover:bg-gray-50 p-0.5 rounded-lg cursor-pointer"
                   onClick={() => {
                     console.log('Parent div clicked for gradient:', gradient.id);
                     handleGradientSelect(gradient);
@@ -391,9 +437,9 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = ({
                       handleGradientSelect(gradient);
                     }}
                     title={`${gradient.type} gradient - ${gradient.direction}`}
-                    className={getGradientThumbnailClass(gradient)}
+                    className={getGradientThumbnailClass(gradient).replace('h-20', 'h-16')}
                   ></div>
-                  <span className="text-xs mt-1 text-gray-500 truncate w-full text-center">
+                  <span className="text-[10px] mt-0.5 text-gray-500 truncate w-full text-center">
                     {getGradientLabel(gradient) || gradient.direction}
                   </span>
                 </div>

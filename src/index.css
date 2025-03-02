@@ -1,61 +1,72 @@
+/* Import SF Pro lookalike font from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply bg-gray-900 text-gray-100;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    font-weight: 300; /* Lighter default font weight */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.015em; /* Slight negative tracking like Apple */
+  }
+  
+  /* Apply thin font to headings */
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 300;
+    letter-spacing: -0.03em; /* More negative tracking for headings */
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
   }
 }
 
 @layer components {
   .gradient-display {
-    @apply w-full h-80 rounded-lg shadow-md transition-all duration-300 relative;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-  }
-  
-  .gradient-display:hover {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-    transform: translateY(-2px);
-  }
-  
-  .portrait-orientation {
-    width: 280px;
-    height: 400px;
-    max-height: 80vh;
-    aspect-ratio: 210 / 297; /* A4 paper ratio */
-    position: relative;
-    overflow: hidden;
+    @apply relative overflow-hidden rounded-lg;
+    padding-top: 56.25%; /* 16:9 Aspect Ratio */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    width: 100%;
+    max-width: 400px;
     margin: 0 auto;
   }
   
-  /* Add a subtle sunrise/sunset horizon glow effect */
-  .portrait-orientation::after {
-    content: '';
+  .gradient-display:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+  
+  .portrait-orientation {
+    /* A4 aspect ratio (1:1.414) */
+    padding-top: 141.4%; 
+    width: 100%;
+    max-width: 450px; /* Increased for better visibility */
+    position: relative;
+    margin: 0 auto;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  }
+  
+  .portrait-orientation > div {
     position: absolute;
+    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 20px 3px rgba(255, 165, 0, 0.3);
-    z-index: 1;
-    pointer-events: none;
+    width: 100%;
+    height: 100%;
   }
   
-  /* Add a subtle label for showing gradient type */
   .gradient-label {
-    position: absolute;
-    bottom: 8px;
-    right: 8px;
-    background-color: rgba(0, 0, 0, 0.6);
-    color: white;
-    font-size: 0.75rem;
-    padding: 2px 6px;
-    border-radius: 4px;
+    @apply absolute bottom-0 left-0 right-0 p-3 text-white bg-black bg-opacity-50 backdrop-blur-sm;
+    transition: opacity 0.3s ease;
     z-index: 10;
   }
   
@@ -152,5 +163,151 @@
     max-width: 100%;
     max-height: 50vh;
     object-fit: contain;
+  }
+  
+  /* New landing page styles */
+  .animated-text-gradient {
+    background: linear-gradient(to right, #9f7aea, #4c51bf, #f56565, #ed8936);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-size: 300% 100%;
+    animation: gradient-shift 8s ease infinite;
+  }
+  
+  @keyframes gradient-shift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  .glass-card {
+    background: rgba(17, 24, 39, 0.7);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .glass-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .hero-button {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+  
+  .hero-button::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #4c51bf, #9f7aea);
+    opacity: 0;
+    transition: opacity 0.3s;
+    z-index: -1;
+  }
+  
+  .hero-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(79, 70, 229, 0.2);
+  }
+  
+  .glow-effect {
+    position: relative;
+  }
+  
+  .glow-effect::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #4f46e5, #8b5cf6, #ec4899);
+    border-radius: inherit;
+    z-index: -1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  
+  .glow-effect:hover::before {
+    opacity: 1;
+  }
+  
+  /* Focus styles */
+  button:focus, a:focus {
+    @apply outline-none ring-2 ring-purple-500 ring-offset-2 ring-offset-gray-900;
+  }
+  
+  /* Extra animation keyframes */
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  /* Utility classes */
+  .animate-float {
+    animation: float 5s ease-in-out infinite;
+  }
+  
+  .backdrop-blur {
+    backdrop-filter: blur(8px);
+  }
+  
+  /* Scroll animation classes */
+  .animate-on-scroll {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+  }
+  
+  .animate-in {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+  }
+  
+  /* Premium design elements */
+  .premium-gradient-border {
+    position: relative;
+    border-radius: 0.5rem;
+    padding: 1px;
+    background: linear-gradient(to right, #4f46e5, #8b5cf6, #ec4899);
+  }
+  
+  .premium-gradient-border > * {
+    background: #111827;
+    border-radius: 0.4rem;
+    height: 100%;
+    width: 100%;
+  }
+  
+  /* Animated background styles */
+  .animated-bg {
+    animation: background-pan 10s ease infinite;
+    background: linear-gradient(to right, #111827, #1e2140, #1a1a47, #111827);
+    background-size: 400% 100%;
+  }
+  
+  @keyframes background-pan {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+  }
+}
+
+/* Animation keyframes */
+@keyframes gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
   }
 } 

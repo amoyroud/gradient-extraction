@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import Router from './Router.tsx'
 import MinimalApp from './MinimalApp.tsx'
 import TransitionalApp from './TransitionalApp.tsx'
 import './index.css'
@@ -59,11 +60,11 @@ const FallbackApp: React.FC = () => {
 try {
   const root = ReactDOM.createRoot(document.getElementById('root')!)
   
-  // Use the full App component now that we've fixed the color extraction issues
+  // Use the Router component instead of App directly
   root.render(
     <React.StrictMode>
       <ErrorBoundary>
-        <App />
+        <Router />
       </ErrorBoundary>
     </React.StrictMode>
   )
