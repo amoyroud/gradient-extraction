@@ -13,6 +13,41 @@ const getBrightness = (hex: string): number => {
   return (r * 299 + g * 587 + b * 114) / 1000;
 };
 
+// Maximum dimensions to resize an image to before processing
+// Reduces processing time while maintaining sufficient color fidelity
+const MAX_ANALYSIS_WIDTH = 800;
+const MAX_ANALYSIS_HEIGHT = 800;
+
+// Resize image for faster processing while maintaining color fidelity
+const resizeImageForAnalysis = (img: HTMLImageElement): HTMLCanvasElement => {
+  const canvas = document.createElement('canvas');
+  let width = img.width;
+  let height = img.height;
+  
+  // Only resize if the image is larger than our maximum dimensions
+  if (width > MAX_ANALYSIS_WIDTH || height > MAX_ANALYSIS_HEIGHT) {
+    const ratio = Math.min(
+      MAX_ANALYSIS_WIDTH / width,
+      MAX_ANALYSIS_HEIGHT / height
+    );
+    
+    width = Math.floor(width * ratio);
+    height = Math.floor(height * ratio);
+  }
+  
+  canvas.width = width;
+  canvas.height = height;
+  
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    // Use high-quality image resizing
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, width, height);
+  }
+  
+  return canvas;
+};
+
 // Extract dominant color from a specific region of pixel data
 const getDominantColorFromRegion = (
   data: Uint8ClampedArray,
@@ -75,8 +110,8 @@ export const extractColors = (
     
     img.onload = () => {
       try {
-        // Create a canvas element
-        const canvas = document.createElement('canvas');
+        // Resize image for faster processing
+        const canvas = resizeImageForAnalysis(img);
         const ctx = canvas.getContext('2d');
         
         if (!ctx) {
@@ -84,14 +119,7 @@ export const extractColors = (
           return;
         }
         
-        // Set canvas dimensions to match image
-        canvas.width = img.width;
-        canvas.height = img.height;
-        
-        // Draw the image on the canvas
-        ctx.drawImage(img, 0, 0);
-        
-        // Get pixel data
+        // Get pixel data from the resized image
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const pixelData = imageData.data;
         

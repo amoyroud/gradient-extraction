@@ -1,13 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, Suspense, lazy, memo } from 'react'
 import ImageUploader from './components/ImageUploader'
-import GradientDisplay from './components/GradientDisplay'
-import LoadingSpinner from './components/LoadingSpinner'
 import { ColorPalette, Gradient } from './types'
+import LoadingSpinner from './components/LoadingSpinner'
 import PremiumLanding from './components/PremiumLanding'
-import FloatingGradientLanding from './components/FloatingGradientLanding'
 
-const App = () => {
-  console.log('App component rendering')
+// Lazy load non-critical components
+const GradientDisplay = lazy(() => import('./components/GradientDisplay'))
+const FloatingGradientLanding = lazy(() => import('./components/FloatingGradientLanding'))
+
+// Loading fallback for lazy-loaded components
+const LazyLoadingFallback = () => (
+  <div className="flex items-center justify-center p-4 min-h-[200px]">
+    <div className="animate-pulse flex space-x-2">
+      <div className="h-3 w-3 bg-gray-300 rounded-full"></div>
+      <div className="h-3 w-3 bg-gray-300 rounded-full"></div>
+      <div className="h-3 w-3 bg-gray-300 rounded-full"></div>
+    </div>
+  </div>
+);
+
+// Memoize the entire App component to prevent unnecessary re-renders
+const App = memo(() => {
+  // Remove logging in production
+  // console.log('App component rendering')
   
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [colorPalette, setColorPalette] = useState<ColorPalette | null>(null)
@@ -21,14 +36,22 @@ const App = () => {
   const [showUploader, setShowUploader] = useState<boolean>(false)
   const [showLanding, setShowLanding] = useState<boolean>(true)
 
+  // Performance optimization: Preload GradientDisplay component when image upload starts
   useEffect(() => {
-    console.log('App component mounted')
-    // Check if all imported components are available
-    console.log('Components available:', {
-      ImageUploader: !!ImageUploader,
-      GradientDisplay: !!GradientDisplay
-    })
+    if (isLoading && !uploadedImage) {
+      // Preload the GradientDisplay component that will be needed soon
+      const preloadGradientDisplay = () => {
+        // Just importing triggers the preload
+        import('./components/GradientDisplay');
+      };
+      preloadGradientDisplay();
+    }
+  }, [isLoading, uploadedImage]);
 
+  useEffect(() => {
+    // Remove logging in production
+    // console.log('App component mounted')
+    
     // Check for errors during initialization
     const handleError = (event: ErrorEvent) => {
       console.error('Unhandled error:', event.error)
@@ -42,11 +65,11 @@ const App = () => {
     }
   }, [])
   
-  const goToHome = () => {
+  const goToHome = useCallback(() => {
     window.location.hash = '';
-  };
+  }, []);
 
-  const copyGradientCSS = () => {
+  const copyGradientCSS = useCallback(() => {
     if (!selectedGradient) return;
     
     const css = `background-image: ${selectedGradient.css};`;
@@ -55,23 +78,33 @@ const App = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
-  };
+  }, [selectedGradient]);
   
-  const handleGetStarted = () => {
+  const handleGetStarted = useCallback(() => {
     setShowLanding(false);
     setShowUploader(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
   // Wrap handleSelectGradient in useCallback to prevent it from changing on each render
   const handleSelectGradient = useCallback((gradient: Gradient) => {
-    console.log('Gradient selected in App:', gradient.id);
-    setSelectedGradient(gradient);
+    // Only log in development environment to avoid performance impact
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Gradient selected in App:', gradient.id);
+    }
+    
+    // Only update if the gradient has changed to prevent unnecessary re-renders
+    setSelectedGradient(prevGradient => {
+      if (prevGradient?.id !== gradient.id) {
+        return gradient;
+      }
+      return prevGradient;
+    });
   }, []); // Empty dependency array means this function won't change
 
-  const handleImageUpload = (file: File) => {
+  const handleImageUpload = useCallback((file: File) => {
     setUploadedImage(URL.createObjectURL(file));
-  };
+  }, []);
 
   // Handler to reset the uploaded image
   const handleResetImage = useCallback(() => {
@@ -79,28 +112,38 @@ const App = () => {
     setImageUrl(null);
     setPalette(null);
     setSelectedGradient(null);
-    setShowLanding(true);
+    setShowLanding(false);
+    setShowUploader(true);
   }, []);
+
+  // Memoize the error display component to prevent re-renders
+  const errorDisplay = useMemo(() => {
+    if (!error) return null;
+    
+    return (
+      <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-md">
+        <p>{error}</p>
+        <button 
+          className="mt-2 text-sm text-red-800 underline"
+          onClick={() => setError(null)}
+        >
+          Dismiss
+        </button>
+      </div>
+    );
+  }, [error]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <div className="container mx-auto px-4 py-8 flex-grow flex flex-col">
-        {error && (
-          <div className="mb-6 p-4 bg-red-100 text-red-700 rounded-md">
-            <p>{error}</p>
-            <button 
-              className="mt-2 text-sm text-red-800 underline"
-              onClick={() => setError(null)}
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
+        {errorDisplay}
 
         {!uploadedImage ? (
           <>
             {showLanding ? (
-              <FloatingGradientLanding onGetStarted={handleGetStarted} />
+              <Suspense fallback={<LazyLoadingFallback />}>
+                <FloatingGradientLanding onGetStarted={handleGetStarted} />
+              </Suspense>
             ) : (
               <div className="max-w-3xl mx-auto my-auto flex-grow flex flex-col justify-center">
                 <div className="text-center mb-8">
@@ -131,20 +174,20 @@ const App = () => {
             ) : null}
             
             {palette && uploadedImage && (
-              <GradientDisplay 
-                palette={palette} 
-                uploadedImage={uploadedImage}
-                onSelectGradient={handleSelectGradient}
-                onResetImage={handleResetImage}
-              />
+              <Suspense fallback={<LazyLoadingFallback />}>
+                <GradientDisplay 
+                  palette={palette} 
+                  uploadedImage={uploadedImage}
+                  onSelectGradient={handleSelectGradient}
+                  onResetImage={handleResetImage}
+                />
+              </Suspense>
             )}
           </>
         )}
       </div>
-      
-      {/* Footer has been removed */}
     </div>
   )
-}
+});
 
 export default App 

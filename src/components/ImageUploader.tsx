@@ -1,7 +1,7 @@
 import React, { useCallback, useState, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { extractColors } from '../utils/simpleColorExtractor'
 import { ColorPalette } from '../types'
+import { useColorExtraction } from '../utils/useColorExtraction'
 
 // Updated props interface to match what App.tsx is passing
 interface UpdatedImageUploaderProps {
@@ -12,7 +12,7 @@ interface UpdatedImageUploaderProps {
   setUploadedImage: (url: string | null) => void;
 }
 
-const ImageUploader: React.FC<UpdatedImageUploaderProps> = ({ 
+const ImageUploader: React.FC<UpdatedImageUploaderProps> = React.memo(({ 
   setImageUrl,
   setColorPalette,
   setIsLoading,
@@ -21,6 +21,14 @@ const ImageUploader: React.FC<UpdatedImageUploaderProps> = ({
 }) => {
   const [colorCount, setColorCount] = useState<number>(7);
   const [cachedImageUrl, setCachedImageUrl] = useState<string | null>(null);
+  
+  // Use our optimized color extraction hook
+  const { extractColors, isProcessing } = useColorExtraction();
+  
+  // Keep parent component's loading state in sync with our local processing state
+  useEffect(() => {
+    setIsLoading(isProcessing);
+  }, [isProcessing, setIsLoading]);
   
   // This effect will re-extract colors when colorCount changes if we have a cached image
   useEffect(() => {
@@ -34,7 +42,7 @@ const ImageUploader: React.FC<UpdatedImageUploaderProps> = ({
     setIsLoading(true);
     
     try {
-      // Extract colors from the image using our simplified extractor
+      // Use our optimized web worker-based color extractor
       const palette = await extractColors(imageUrl, colorCount);
       setColorPalette(palette);
     } catch (error) {
@@ -43,34 +51,34 @@ const ImageUploader: React.FC<UpdatedImageUploaderProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [setColorPalette, setIsLoading, setError, colorCount]);
+  }, [setColorPalette, setIsLoading, setError, colorCount, extractColors]);
   
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) return;
     
+    // Reset any previous errors
+    setError(null);
+    
+    // Get the first file (we only accept one file at a time)
     const file = acceptedFiles[0];
-    if (!file.type.match('image.*')) {
-      setError('Please upload an image file');
+    
+    // Only accept image files
+    if (!file.type.startsWith('image/')) {
+      setError('Please upload an image file.');
       return;
     }
     
-    // Reset palette
-    setColorPalette(null);
-    
-    // Create a URL for the image
+    // Create a temporary URL for the file
     const imageUrl = URL.createObjectURL(file);
+    setCachedImageUrl(imageUrl);
     
-    // Update UI with the new image
+    // Set the image URL for preview
     setImageUrl(imageUrl);
     setUploadedImage(imageUrl);
     
-    // Cache the image URL for later re-processing
-    setCachedImageUrl(imageUrl);
-    
     // Extract colors from the image
     await extractColorsFromImage(imageUrl);
-    
-  }, [setImageUrl, setColorPalette, setUploadedImage, extractColorsFromImage, setError]);
+  }, [setImageUrl, setUploadedImage, extractColorsFromImage, setError]);
   
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -155,6 +163,6 @@ const ImageUploader: React.FC<UpdatedImageUploaderProps> = ({
       )}
     </div>
   )
-}
+})
 
 export default ImageUploader 
