@@ -1,0 +1,13 @@
+name = "gradient-experiment"
+compatibility_date = "2024-03-25"
+
+[site]
+bucket = "./dist"
+pages_build_output_dir = "dist"
+
+[env.production]
+route = "gradient.antoinemoyroud.com/*"
+
+[build]
+command = "npm run build"
+output_dir = "dist" 

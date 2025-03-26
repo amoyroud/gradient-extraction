@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, ComponentType } from 'react';
+import { Suspense, lazy, ComponentType } from 'react';
 
 // Loading fallback for async components
 export const LoadingFallback = () => (
@@ -11,33 +11,41 @@ export const LoadingFallback = () => (
   </div>
 );
 
-// Type for component loading function
-type ComponentLoader<P> = () => Promise<{ default: ComponentType<P> }>;
-
 // Creates a lazy-loaded component with Suspense wrapper
 export function lazyLoad<P extends object>(
-  importFunc: ComponentLoader<P>,
+  importFunc: () => Promise<{ default: ComponentType<P> }>,
   fallback = <LoadingFallback />
 ) {
   const LazyComponent = lazy(importFunc);
   
-  return (props: P) => (
-    <Suspense fallback={fallback}>
-      <LazyComponent {...props} />
-    </Suspense>
-  );
+  return function WrappedComponent(props: P) {
+    return (
+      <Suspense fallback={fallback}>
+        <LazyComponent {...props} />
+      </Suspense>
+    );
+  };
 }
 
 // Create a preload function for eager loading when hovering or on route change
 export function createPreloadableComponent<P extends object>(
-  importFunc: ComponentLoader<P>
+  importFn: () => Promise<{ default: ComponentType<P> }>,
+  preloadFn?: () => void
 ) {
-  const LazyComponent = lazyLoad(importFunc);
-  
-  // Add a preload method to trigger the import
-  const preload = () => {
-    importFunc();
+  const LazyComponent = lazy(importFn);
+
+  const PreloadableComponent = (props: P) => (
+    <Suspense fallback={<LoadingFallback />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+
+  PreloadableComponent.preload = () => {
+    if (preloadFn) {
+      preloadFn();
+    }
+    importFn();
   };
-  
-  return Object.assign(LazyComponent, { preload });
+
+  return PreloadableComponent;
 } 

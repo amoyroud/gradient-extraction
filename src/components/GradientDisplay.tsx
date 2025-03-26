@@ -181,38 +181,26 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = React.memo(({
   
   // Initialize gradients when palette changes or customization settings change
   useEffect(() => {
+    console.log("[DEBUG GradientDisplay] useEffect for gradient generation triggered");
+    console.log("[DEBUG GradientDisplay] Current customizationSettings:", customizationSettings);
+    console.log("[DEBUG GradientDisplay] mainGradientUpdated flag:", mainGradientUpdated);
+    
     const generateVariations = async () => {
       setIsLoading(true);
       try {
         // Generate new gradients based on the current palette and customization settings
         const newGradients = await generateGradients(updatedPalette, customizationSettings);
+        console.log("[DEBUG GradientDisplay] Generated new gradients with settings:", customizationSettings);
         
-        // Only update if the gradients have actually changed
-        setGradients(prevGradients => {
-          // Simple check if the gradients are the same by comparing the first one's ID
-          if (prevGradients.length > 0 && 
-              newGradients.length > 0 && 
-              prevGradients[0].id === newGradients[0].id) {
-            return prevGradients;
-          }
-          return newGradients;
-        });
+        // Always update gradients and selected gradient when customization settings change
+        setGradients(newGradients);
+        const newSelectedGradient = newGradients[0];
+        setSelectedGradient(newSelectedGradient);
+        onSelectGradient(newSelectedGradient);
         
-        // Only update selected gradient if needed
-        if (!selectedGradient || mainGradientUpdated) {
-          setSelectedGradient(newGradients[0]);
-          
-          // Avoid unnecessary parent component updates
-          // Only call onSelectGradient if we don't already have a selected gradient
-          // or if we've explicitly requested a main gradient update
-          if (!selectedGradient || mainGradientUpdated) {
-            onSelectGradient(newGradients[0]);
-          }
-          
-          // Reset the flag after handling
-          if (mainGradientUpdated) {
-            setMainGradientUpdated(false);
-          }
+        // Reset the flag after handling
+        if (mainGradientUpdated) {
+          setMainGradientUpdated(false);
         }
       } catch (error) {
         console.error("Error generating gradients:", error);
@@ -222,7 +210,7 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = React.memo(({
     };
 
     generateVariations();
-  }, [updatedPalette, customizationSettings, mainGradientUpdated, onSelectGradient, selectedGradient]);
+  }, [updatedPalette, customizationSettings, mainGradientUpdated, onSelectGradient]);
   
   // Handle gradient selection
   const handleGradientSelect = useCallback((gradient: Gradient) => {
@@ -239,8 +227,36 @@ const GradientDisplay: React.FC<UpdatedGradientDisplayProps> = React.memo(({
 
   // Handler for customization settings changes
   const handleCustomizationChange = (newSettings: GradientCustomizationSettings) => {
-    setCustomizationSettings(newSettings);
-    setMainGradientUpdated(false); // Force gradient regeneration
+    console.log("[DEBUG GradientDisplay] handleCustomizationChange called with:", newSettings);
+    console.log("[DEBUG GradientDisplay] Previous settings:", customizationSettings);
+    
+    // Only update if settings have actually changed
+    if (JSON.stringify(newSettings) !== JSON.stringify(customizationSettings)) {
+      setCustomizationSettings(newSettings);
+      // Set flag to force main gradient update
+      setMainGradientUpdated(true);
+      
+      // Immediately generate new gradients with the updated settings
+      const generateVariations = async () => {
+        setIsLoading(true);
+        try {
+          const newGradients = await generateGradients(updatedPalette, newSettings);
+          setGradients(newGradients);
+          
+          // Update selected gradient
+          const newSelectedGradient = newGradients[0];
+          setSelectedGradient(newSelectedGradient);
+          onSelectGradient(newSelectedGradient);
+        } catch (error) {
+          console.error("Error generating gradients:", error);
+        } finally {
+          setIsLoading(false);
+          setMainGradientUpdated(false);
+        }
+      };
+      
+      generateVariations();
+    }
   };
   
   // Handler for selecting a color count variation

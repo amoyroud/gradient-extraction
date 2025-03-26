@@ -1,3 +1,4 @@
+// @ts-ignore
 import { ColorThief as ColorThiefTs, RGBColor } from 'color-thief-ts'
 import { ColorPalette } from '../types'
 
@@ -23,7 +24,7 @@ export const extractColors = async (imageUrl: string): Promise<ColorPalette> => 
         
         // Get the color palette (8 colors)
         const paletteRgb = await colorThief.getPalette(img, 8)
-        const colors = paletteRgb.map(rgb => rgbToHex(rgb))
+        const colors = paletteRgb.map((rgb: RGBColor) => rgbToHex(rgb))
         
         // Sort colors to create a more visually pleasing gradient (from darker to lighter)
         const sortedColors = [...colors].sort((a, b) => {

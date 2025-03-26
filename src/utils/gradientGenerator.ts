@@ -8,6 +8,7 @@ const applyCustomizationSettings = (
 ): string => {
   // If no settings provided, return default gradient with even color distribution
   if (!settings) {
+    console.log("[DEBUG gradientGenerator] No settings provided, using default even distribution");
     const step = 100 / (colors.length - 1);
     return colors.map((color, index) => `${color} ${index * step}%`).join(', ');
   }
@@ -15,12 +16,20 @@ const applyCustomizationSettings = (
   // Get the blend hardness from settings (default to 50 if not provided)
   const { blendHardness = 50, customColorPositions } = settings;
   
+  console.log("[DEBUG gradientGenerator] Applied settings:", settings);
+  console.log("[DEBUG gradientGenerator] Custom positions:", customColorPositions);
+  
   // If custom color positions are provided, use them to position colors
   if (customColorPositions && customColorPositions.length === colors.length) {
-    return colors.map((color, index) => 
+    console.log("[DEBUG gradientGenerator] Using custom color positions:", customColorPositions);
+    const result = colors.map((color, index) => 
       `${color} ${customColorPositions[index]}%`
     ).join(', ');
+    console.log("[DEBUG gradientGenerator] Result with custom positions:", result);
+    return result;
   }
+  
+  console.log("[DEBUG gradientGenerator] Using blend hardness to determine transitions:", blendHardness);
   
   // Otherwise, use the blend hardness to determine transition smoothness
   // Higher blend hardness = harder color transitions (more distinct)

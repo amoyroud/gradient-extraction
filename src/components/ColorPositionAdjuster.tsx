@@ -28,43 +28,177 @@ const ColorPositionAdjuster: React.FC<ColorPositionAdjusterProps> = React.memo((
   onSettingsChange 
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [positions, setPositions] = useState<number[]>([]);
+  const dragHandlerRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const dragEndHandlerRef = useRef<((e: MouseEvent) => void) | null>(null);
+  const currentDraggingIndexRef = useRef<number | null>(null);
+  
+  // Initialize positions using a memoized value to avoid render-time updates
+  const initialPositions = useMemo(() => {
+    const defaultPositions = colors.map((_, index) => Math.round((index / (colors.length - 1)) * 100));
+    return customizationSettings.customColorPositions || defaultPositions;
+  }, [colors, customizationSettings.customColorPositions]);
+  
+  const [positions, setPositions] = useState<number[]>(initialPositions);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
   const [showPercentages, setShowPercentages] = useState<boolean>(false);
   
-  // Initialize positions based on customization settings or default even spacing
-  useEffect(() => {
-    const newPositions = customizationSettings.customColorPositions || 
-      colors.map((_, index) => Math.round((index / (colors.length - 1)) * 100));
-    
-    // Ensure we have the right number of positions if colors change
-    if (newPositions.length !== colors.length) {
-      // Regenerate positions with equal spacing
-      setPositions(colors.map((_, index) => Math.round((index / (colors.length - 1)) * 100)));
-    } else {
-      setPositions(newPositions);
-    }
-  }, [colors.length, customizationSettings.customColorPositions]);
-  
   // Create a debounced version of the settings change handler
-  // This reduces the number of updates during drag operations
   const debouncedSettingsChange = useCallback(
     debounce((newPositions: number[]) => {
-      onSettingsChange({
+      const newSettings = {
         ...customizationSettings,
         customColorPositions: newPositions
-      });
-    }, 50), // 50ms debounce delay
+      };
+      onSettingsChange(newSettings);
+    }, 50),
     [customizationSettings, onSettingsChange]
   );
-  
-  // Update customization settings when positions change (except during drag)
-  useEffect(() => {
-    if (draggingIndex === null && positions.length === colors.length) {
-      debouncedSettingsChange(positions);
-    }
-  }, [positions, draggingIndex, debouncedSettingsChange]);
 
+  // Define the drag handler
+  const handleDrag = useCallback((e: MouseEvent) => {
+    console.log('[DEBUG] handleDrag called', { currentDraggingIndex: currentDraggingIndexRef.current, e: { clientY: e.clientY } });
+    
+    if (currentDraggingIndexRef.current === null || !containerRef.current) {
+      console.log('[DEBUG] Early return - draggingIndex or container missing', { 
+        draggingIndex: currentDraggingIndexRef.current, 
+        hasContainer: !!containerRef.current 
+      });
+      return;
+    }
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const container = containerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    // Calculate the position as a percentage of container height
+    let newPosition = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    // Clamp the position between adjacent dividers
+    const minPosition = currentDraggingIndexRef.current > 0 ? positions[currentDraggingIndexRef.current - 1] + 2 : 0;
+    const maxPosition = currentDraggingIndexRef.current < positions.length - 1 ? positions[currentDraggingIndexRef.current + 1] - 2 : 100;
+    
+    // Ensure the position stays within bounds
+    newPosition = Math.max(minPosition, Math.min(maxPosition, newPosition));
+    newPosition = Math.round(newPosition);
+    
+    // Only update if position has changed
+    if (newPosition !== positions[currentDraggingIndexRef.current]) {
+      const newPositions = [...positions];
+      newPositions[currentDraggingIndexRef.current] = newPosition;
+      setPositions(newPositions);
+      
+      // Immediately update settings with new positions
+      const newSettings = {
+        ...customizationSettings,
+        customColorPositions: newPositions
+      };
+      onSettingsChange(newSettings);
+      
+      console.log('[DEBUG] Updated positions:', newPositions);
+      console.log('[DEBUG] Sent new settings:', newSettings);
+    }
+  }, [positions, customizationSettings, onSettingsChange]);
+
+  // Define the drag start handler
+  const handleDragStart = useCallback((index: number) => (e: React.MouseEvent) => {
+    console.log('[DEBUG] handleDragStart called', { index });
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Set dragging index first
+    currentDraggingIndexRef.current = index;
+    setDraggingIndex(index);
+    
+    // Store the handlers in local variables to ensure we use the same instance
+    const dragHandler = dragHandlerRef.current;
+    const dragEndHandler = dragEndHandlerRef.current;
+    
+    // Update handlers in refs immediately
+    if (dragHandler && dragEndHandler) {
+      // Prevent text selection during dragging
+      document.body.style.userSelect = 'none';
+      
+      // Add event listeners using the stored handlers
+      window.addEventListener('mousemove', dragHandler);
+      window.addEventListener('mouseup', dragEndHandler);
+      
+      console.log('[DEBUG] Event listeners added', { 
+        hasMouseMove: !!dragHandler, 
+        hasMouseUp: !!dragEndHandler,
+        currentIndex: currentDraggingIndexRef.current 
+      });
+    } else {
+      console.log('[DEBUG] Failed to add event listeners - handlers not ready', {
+        hasDragHandler: !!dragHandler,
+        hasDragEndHandler: !!dragEndHandler
+      });
+    }
+  }, []);
+
+  // Memoize the drag end handler
+  const handleDragEnd = useCallback((e?: MouseEvent) => {
+    console.log('[DEBUG] handleDragEnd called');
+    
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    currentDraggingIndexRef.current = null;
+    setDraggingIndex(null);
+    document.body.style.userSelect = '';
+    
+    // Remove event listeners using the refs
+    if (dragHandlerRef.current) {
+      window.removeEventListener('mousemove', dragHandlerRef.current);
+    }
+    if (dragEndHandlerRef.current) {
+      window.removeEventListener('mouseup', dragEndHandlerRef.current);
+    }
+  }, []);
+
+  // Store the drag handler in a ref
+  useEffect(() => {
+    console.log('[DEBUG] Updating drag handler ref');
+    dragHandlerRef.current = handleDrag;
+    return () => {
+      dragHandlerRef.current = null;
+    };
+  }, [handleDrag]);
+
+  // Store the drag end handler in a ref
+  useEffect(() => {
+    console.log('[DEBUG] Updating drag end handler ref');
+    dragEndHandlerRef.current = handleDragEnd;
+    return () => {
+      dragEndHandlerRef.current = null;
+    };
+  }, [handleDragEnd]);
+
+  // Update positions when colors or customization settings change
+  useEffect(() => {
+    if (!draggingIndex) { // Only update positions if we're not currently dragging
+      const newPositions = customizationSettings.customColorPositions || 
+        colors.map((_, index) => Math.round((index / (colors.length - 1)) * 100));
+      
+      if (newPositions.length !== colors.length) {
+        setPositions(colors.map((_, index) => Math.round((index / (colors.length - 1)) * 100)));
+      } else {
+        setPositions(newPositions);
+      }
+    }
+  }, [colors.length, customizationSettings.customColorPositions, colors, draggingIndex]);
+
+  // Reset to default equal spacing
+  const handleReset = useCallback(() => {
+    const defaultPositions = colors.map((_, index) => 
+      Math.round((index / (colors.length - 1)) * 100)
+    );
+    setPositions(defaultPositions);
+  }, [colors]);
+  
   // Calculate divider positions (between colors) - memoized to prevent recalculation
   const getDividerPositions = useCallback((): number[] => {
     const dividers: number[] = [];
@@ -80,59 +214,8 @@ const ColorPositionAdjuster: React.FC<ColorPositionAdjusterProps> = React.memo((
   // Memoize the divider positions to prevent unnecessary recalculation
   const dividerPositions = useMemo(() => getDividerPositions(), [getDividerPositions]);
 
-  // Memoize the drag start handler
-  const handleDragStart = useCallback((index: number) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    setDraggingIndex(index);
-    window.addEventListener('mousemove', handleDrag);
-    window.addEventListener('mouseup', handleDragEnd);
-  }, []);
-
-  // Optimize the drag handler
-  const handleDrag = useCallback((e: MouseEvent) => {
-    if (draggingIndex === null || !containerRef.current) return;
-    
-    const container = containerRef.current;
-    const rect = container.getBoundingClientRect();
-    const height = rect.height;
-    
-    // Calculate the position as a percentage of container height
-    let newPosition = ((e.clientY - rect.top) / height) * 100;
-    
-    // Clamp the position between adjacent dividers (or 0 and 100 for endpoints)
-    if (draggingIndex === 0) {
-      // First divider can only go to 0%
-      newPosition = 0;
-    } else if (draggingIndex === positions.length - 1) {
-      // Last divider can only go to 100%
-      newPosition = 100;
-    } else {
-      // Middle dividers are constrained between adjacent dividers
-      // with a minimum gap of 2%
-      const minPosition = positions[draggingIndex - 1] + 2;
-      const maxPosition = draggingIndex < positions.length - 1 ? positions[draggingIndex + 1] - 2 : 100;
-      
-      newPosition = Math.max(minPosition, Math.min(newPosition, maxPosition));
-    }
-    
-    // Update the positions array
-    const newPositions = [...positions];
-    newPositions[draggingIndex] = Math.round(newPosition);
-    setPositions(newPositions);
-    
-    // Update the gradient in real-time during dragging with the debounced handler
-    debouncedSettingsChange(newPositions);
-  }, [draggingIndex, positions, debouncedSettingsChange]);
-
-  // Memoize the drag end handler
-  const handleDragEnd = useCallback(() => {
-    setDraggingIndex(null);
-    window.removeEventListener('mousemove', handleDrag);
-    window.removeEventListener('mouseup', handleDragEnd);
-  }, [handleDrag]);
-  
   // Get height percentage for each color segment
-  const getSegmentHeights = (): number[] => {
+  const getSegmentHeights = useCallback((): number[] => {
     const heights: number[] = [];
     
     // First segment: from 0 to first divider
@@ -147,18 +230,11 @@ const ColorPositionAdjuster: React.FC<ColorPositionAdjusterProps> = React.memo((
     heights.push(100 - positions[positions.length - 1]);
     
     return heights;
-  };
-  
-  // Reset to default equal spacing
-  const handleReset = () => {
-    const defaultPositions = colors.map((_, index) => 
-      Math.round((index / (colors.length - 1)) * 100)
-    );
-    setPositions(defaultPositions);
-  };
-  
-  const segmentHeights = getSegmentHeights();
-  
+  }, [positions]);
+
+  // Memoize segment heights to prevent recalculation
+  const segmentHeights = useMemo(() => getSegmentHeights(), [getSegmentHeights]);
+
   return (
     <div className="bg-white rounded-lg shadow-md p-2 mb-2">
       <div className="flex justify-between items-center mb-1">
@@ -182,18 +258,20 @@ const ColorPositionAdjuster: React.FC<ColorPositionAdjusterProps> = React.memo((
             })`
           }}
         >
-          {/* Dividers between colors */}
-          {dividerPositions.map((position, index) => (
+          {/* Add dividers */}
+          {positions.slice(1, -1).map((position, index) => (
             <div
               key={index}
-              className={`absolute left-0 right-0 h-1.5 bg-white bg-opacity-50 hover:bg-opacity-80 cursor-row-resize 
-                        ${draggingIndex === index + 1 ? 'bg-opacity-80' : ''}`}
+              className="absolute left-0 w-full h-1 bg-white/30 cursor-row-resize hover:bg-white/50 transition-colors"
               style={{ 
-                top: `calc(${position}% - 3px)`,
-                boxShadow: '0 0 0 1px rgba(0,0,0,0.1)'
+                top: `${position}%`,
+                transform: 'translateY(-50%)',
+                cursor: draggingIndex === index + 1 ? 'grabbing' : 'grab'
               }}
-              onMouseDown={handleDragStart(index + 1)}
-              title="Drag to adjust color distribution"
+              onMouseDown={(e) => {
+                console.log('[DEBUG] Divider clicked:', { index: index + 1 });
+                handleDragStart(index + 1)(e);
+              }}
             />
           ))}
           
@@ -225,13 +303,16 @@ const ColorPositionAdjuster: React.FC<ColorPositionAdjusterProps> = React.memo((
           })}
         </div>
         
-        {/* Color squares next to gradient for better visualization */}
-        <div className="flex flex-col h-64 justify-between">
+        {/* Color swatches */}
+        <div className="flex flex-col space-y-1">
           {colors.map((color, index) => (
             <div
-              key={`color-${index}`}
-              className="w-8 h-8 rounded-md shadow-sm"
-              style={{ backgroundColor: color }}
+              key={index}
+              className="w-10 h-10 rounded-md shadow-sm"
+              style={{ 
+                backgroundColor: color,
+                marginTop: index === 0 ? '0' : `${positions[index] - positions[index-1]}%`
+              }}
               title={color}
             />
           ))}
